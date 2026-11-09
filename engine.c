@@ -51,11 +51,6 @@ typedef enum {
     B_KING      = 0b1110,
 } PieceType;
 
-typedef struct {
-    PieceType type;
-    uint8_t index;
-} Piece;
-
 uint8_t board[64] = {
     B_ROOK, B_KNIGHT, B_BISHOP, B_QUEEN, B_KING, B_BISHOP, B_KNIGHT, B_ROOK,
     B_PAWN, B_PAWN,   B_PAWN,   B_PAWN,  B_PAWN, B_PAWN,   B_PAWN,   B_PAWN,
@@ -66,16 +61,3 @@ uint8_t board[64] = {
     W_PAWN, W_PAWN,   W_PAWN,   W_PAWN,  W_PAWN, W_PAWN,   W_PAWN,   W_PAWN,
     W_ROOK, W_KNIGHT, W_BISHOP, W_QUEEN, W_KING, W_BISHOP, W_KNIGHT, W_ROOK,
 };
-
-Piece pieces[NUM_PIECES];
-
-void init_pieces(void){
-    int n = 0;
-    for (int index = 0; index < 64; index++){
-        if (board[index] != EMPTY){
-            pieces[n].type = board[index];
-            pieces[n].index = (uint8_t)index;
-            n++;
-        }
-    }
-}
