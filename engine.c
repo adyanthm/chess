@@ -47,6 +47,10 @@ static const int queen_directions[8][2] = {
     { 0,  1}, { 0, -1}
 };
 
+static int is_empty(int index){
+    return board[index] == EMPTY;
+}
+
 static int offset(int index, int df, int dr) {
     int file = index % 8 + df;
     int rank = index / 8 + dr;
@@ -61,12 +65,10 @@ int possible_moves(PieceType piece, int index, int *move_buf){
     int piece_type = piece & TYPE_MASK;
     int size = 0;
     uint8_t me = piece & COLOR_BIT;
-
+    int pawn_dir = (me == (B_PAWN & COLOR_BIT)) ? 1 : -1;
     switch (piece_type) {
         case W_KING:
-        case B_KING:
-        case W_KNIGHT:
-        case B_KNIGHT: {
+        case W_KNIGHT: {
 
             const int (*deltas)[2] = (piece_type == W_KNIGHT || piece_type == B_KNIGHT) ? knight_deltas : king_deltas;
 
@@ -79,13 +81,9 @@ int possible_moves(PieceType piece, int index, int *move_buf){
             }
             break;
         }
-
         case W_QUEEN:
-        case B_QUEEN:
         case W_BISHOP:
-        case B_BISHOP:
-        case W_ROOK:
-        case B_ROOK: {
+        case W_ROOK:{
 
             const int (*deltas)[2] =
                 (piece_type == W_BISHOP || piece_type == B_BISHOP) ? bishop_directions :
@@ -112,6 +110,29 @@ int possible_moves(PieceType piece, int index, int *move_buf){
 
                     break;
                 }
+            }
+            break;
+        }
+        case W_PAWN: {
+            int rank = index / 8;
+            int start_rank = (pawn_dir == 1) ? 1 : 6;
+
+            // pawn_dir is 1 for black and -1 for white.
+            // move forward
+            int one = offset(index, 0, pawn_dir);
+            if (one != -1 && is_empty(one)) {
+                move_buf[size++] = one;
+
+                int two = offset(index, 0, 2 * pawn_dir);
+                if (rank == start_rank && two != -1 && is_empty(two))
+                    move_buf[size++] = two;
+            }
+
+            // capture
+            for (int df = -1; df <= 1; df += 2) {
+                int cap = offset(index, df, pawn_dir);
+                if (cap != -1 && !is_empty(cap) && (board[cap] & COLOR_BIT) != me)
+                    move_buf[size++] = cap;
             }
             break;
         }
