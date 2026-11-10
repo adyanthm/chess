@@ -1,4 +1,5 @@
 #include <raylib.h>
+#include <stdint.h>
 #include "engine.h"
 #include "themes.h"
 
@@ -13,6 +14,12 @@ static int legal_move_count = 0;
 
 Texture2D sheet;
 float tile_W, tile_H;
+
+/*
+ * 0 = white's turn
+ * 1 = black's turn
+ */
+uint8_t turn = 0;
 
 /*
  * Our enum starts with pawn as 1. but the sprite sheet has king as 1.
@@ -49,6 +56,12 @@ static bool is_legal_target(int sq) {
     return false;
 }
 
+static bool is_turn_piece(uint8_t piece){
+    if (piece == EMPTY) return false;
+    bool black = piece & COLOR_BIT; // black is nonzero but white is zero
+    return black ? (turn == 1) : (turn == 0);
+}
+
 void draw_piece(uint8_t piece, int x, int y, int size){
     int col = type_to_col[piece & TYPE_MASK];
     int row = piece & COLOR_BIT ? 1 : 0;
@@ -82,13 +95,18 @@ static void draw_pieces(void) {
     }
 }
 
-
-
 static void draw_selection(void) {
     if (selected_square < 0) return;
 
     Vector2 pos = idxtovec(selected_square);
     DrawRectangle(pos.x, pos.y, SQ, SQ, is_light_square(selected_square) ? theme->selection_light : theme->selection_dark);
+}
+
+static void make_move(int from, int to){
+    board[to] = board[from];
+    board[from] = EMPTY;
+    turn = (turn == 0) ? 1 : 0;
+    clear_selection();
 }
 
 static void handle_mouse(void){
@@ -97,10 +115,8 @@ static void handle_mouse(void){
     int clicked = mouse_to_square(GetMousePosition());
 
     if (clicked >= 0 && is_legal_target(clicked)){
-        board[clicked] = board[selected_square];
-        board[selected_square] = EMPTY;
-        clear_selection();
-    } else if (clicked >= 0 && board[clicked] != EMPTY){
+        make_move(selected_square, clicked);
+    } else if (clicked >= 0 && is_turn_piece(board[clicked])){
         selected_square = clicked;
         legal_move_count = possible_moves(board[clicked], clicked, legal_moves);
     } else {
