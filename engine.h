@@ -1,5 +1,6 @@
 #ifndef ENGINE_H
 #define ENGINE_H
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
@@ -52,8 +53,21 @@ typedef enum {
     B_KING      = 0b1110,
 } PieceType;
 
+typedef enum {
+    PLAYING,
+    CHECKMATE,
+    STALEMATE,
+} GameStatus;
+
+#define BLACK_COLOR 0b1000
+#define WHITE_COLOR 0b0000
+
 extern uint8_t board[64];
 
 int possible_moves(PieceType piece, int index, int *move_buf);
-
+int is_under_attack(int index, int color);
+int find_king(uint8_t color);
+bool is_check(uint8_t color);
+int legal_moves_from(int from, int *buf);
+GameStatus game_status(uint8_t color);
 #endif

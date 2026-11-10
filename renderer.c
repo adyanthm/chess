@@ -1,9 +1,9 @@
 #include <raylib.h>
-#include <stdint.h>
 #include "engine.h"
 #include "themes.h"
 
 static const Theme *theme = &THEME_GREEN;
+static GameStatus status = PLAYING;
 
 static const int ORIGIN = 50;
 static const int SQ = 100;
@@ -11,6 +11,7 @@ static const int SQ = 100;
 static int selected_square = -1;
 static int legal_moves[64];
 static int legal_move_count = 0;
+static bool in_check = false;
 
 Texture2D sheet;
 float tile_W, tile_H;
@@ -20,6 +21,9 @@ float tile_W, tile_H;
  * 1 = black's turn
  */
 uint8_t turn = 0;
+static uint8_t turn_color(void){
+    return turn ? BLACK_COLOR : WHITE_COLOR;
+}
 
 /*
  * Our enum starts with pawn as 1. but the sprite sheet has king as 1.
@@ -28,14 +32,25 @@ uint8_t turn = 0;
 
 int type_to_col[] = {-1, 5, 3, 2, 4, 1, 0};
 
-void load_pieces(void){
-    sheet = LoadTexture("chess_sheet.png");
+extern const unsigned char _binary_chess_sheet_png_start[];
+extern const unsigned char _binary_chess_sheet_png_end[];
+
+void load_pieces(void) {
+    Image img = LoadImageFromMemory(
+        ".png",
+        _binary_chess_sheet_png_start,
+        (int)(_binary_chess_sheet_png_end - _binary_chess_sheet_png_start)
+    );
+
+    sheet = LoadTextureFromImage(img);
+    UnloadImage(img);
+
     GenTextureMipmaps(&sheet);
     SetTextureFilter(sheet, TEXTURE_FILTER_TRILINEAR);
+
     tile_W = sheet.width / 6.0f;
     tile_H = sheet.height / 2.0f;
 }
-
 static int mouse_to_square(Vector2 mouse){
     int file = (mouse.x - ORIGIN) / SQ;
     int rank = (mouse.y - ORIGIN) / SQ;
@@ -107,9 +122,12 @@ static void make_move(int from, int to){
     board[from] = EMPTY;
     turn = (turn == 0) ? 1 : 0;
     clear_selection();
+    status = game_status(turn_color());
+    in_check = is_check(turn_color());
 }
 
 static void handle_mouse(void){
+    if (status != PLAYING) return;
     if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return;
 
     int clicked = mouse_to_square(GetMousePosition());
@@ -118,7 +136,7 @@ static void handle_mouse(void){
         make_move(selected_square, clicked);
     } else if (clicked >= 0 && is_turn_piece(board[clicked])){
         selected_square = clicked;
-        legal_move_count = possible_moves(board[clicked], clicked, legal_moves);
+        legal_move_count = legal_moves_from(clicked, legal_moves);
     } else {
         clear_selection();
     }
@@ -137,16 +155,38 @@ static void draw_move_indicators(void) {
     }
 }
 
+static void draw_check_highlight(void){
+    if (!in_check) return;
+    int k = find_king(turn_color());
+    if (k == -1) return;
+    Vector2 p = idxtovec(k);
+    const Color HIGHLIGHTED = {255, 0, 0, 123};
+    DrawRectangle(p.x, p.y, SQ, SQ, HIGHLIGHTED);
+}
+
 static void handle_keys(void){
     for (int i = 0; i < THEME_COUNT; i++)
         if (IsKeyPressed(KEY_ONE + i)) theme = THEMES[i];
+}
+
+static void draw_status(void){
+    const char *msg;
+    if (status == CHECKMATE)
+        msg = turn ? "Checkmate - White wins" : "Checkmate - Black wins";
+    else if (status == STALEMATE)
+        msg = "Stalemate - draw";
+    else if (in_check)
+        msg = turn ? "Black is in check" : "White is in check";
+    else
+        msg = turn ? "Black to move" : "White to move";
+    DrawText(msg, 50, 10, 30, RAYWHITE);
 }
 
 int main(void){
     const int width = 900;
     const int height = 900;
 
-    SetTraceLogLevel(LOG_WARNING);
+    SetTraceLogLevel(LOG_NONE);
     InitWindow(width, height, "Chess");
     load_pieces();
     SetExitKey(KEY_NULL);
@@ -157,11 +197,13 @@ int main(void){
         handle_keys();
         handle_mouse();
         BeginDrawing();
-        ClearBackground(theme->bg);  // warm charcoal color.
+        ClearBackground(theme->bg);
         draw_squares();
+        draw_check_highlight();
         draw_selection();
         draw_move_indicators();
         draw_pieces();
+        draw_status();
         EndDrawing();
     }
 

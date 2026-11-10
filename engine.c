@@ -1,5 +1,4 @@
 #include "engine.h"
-#include <raylib.h>
 
 uint8_t board[64] = {
     B_ROOK, B_KNIGHT, B_BISHOP, B_QUEEN, B_KING, B_BISHOP, B_KNIGHT, B_ROOK,
@@ -138,4 +137,121 @@ int possible_moves(PieceType piece, int index, int *move_buf){
         }
     }
     return size;
+}
+
+int find_king(uint8_t color){
+    for (int i = 0; i < 64; i++){
+        int piece = board[i];
+        if(piece != EMPTY && (piece & TYPE_MASK) == W_KING && (piece & COLOR_BIT) == color)
+            return i;
+    }
+    return -1;
+}
+
+bool is_check(uint8_t color){
+    int king = find_king(color);
+    return king != -1 && is_under_attack(king, color) != -1;
+}
+
+int is_under_attack(int index, int piece){
+    uint8_t me = piece & COLOR_BIT;
+
+    // knight + king
+    for (int j = 0; j < 2; j++){
+        int piece_type = (j == 0) ? W_KNIGHT : W_KING;
+        const int (*deltas)[2] = (j == 0) ? knight_deltas : king_deltas;
+        for (int i = 0; i < 8; i++){
+            int to = offset(index, deltas[i][0], deltas[i][1]);
+            if (to == -1) continue;
+            uint8_t target = board[to];
+            if ((target & TYPE_MASK)== piece_type && // knight / king
+                (target & COLOR_BIT) != me) // its an enemy.
+                return to;
+        }
+    }
+
+
+    // bishop + rook + queen.
+    for (int j = 0; j < 2; j++){
+        const int (*directions)[2] = (j == 0) ? bishop_directions : rook_directions;
+        int piece_type = (j == 0) ? W_BISHOP : W_ROOK;
+        for (int i = 0; i < 4; i++){
+            int df = directions[i][0];
+            int dr = directions[i][1];
+            int pos = index;
+            while ((pos = offset(pos, df, dr)) != -1){
+                uint8_t target = board[pos];
+                if (target == EMPTY){
+                    continue;
+                }
+                if ((target & COLOR_BIT) != me && // its an enemy
+                    ((target & TYPE_MASK) == piece_type || (target & TYPE_MASK) == W_QUEEN)) // its a (bishop / rook) / queen
+                    return pos;
+                break;
+            }
+        }
+    }
+
+    // pawns
+    int my_dir = me ? 1 : -1; // pawns attack me in same direction as my pawns move.
+    int offsets[2][2] = {{1, my_dir}, {-1, my_dir}};
+    for (int i = 0; i < 2; i++) {
+        int from = offset(index, offsets[i][0], offsets[i][1]);
+        if (from == -1) continue;               // off the board
+
+        uint8_t t = board[from];
+        if (t != EMPTY &&
+            (t & TYPE_MASK) == W_PAWN &&        // it's a pawn
+            (t & COLOR_BIT) != me)              // and it's an enemy
+            return from;
+    }
+    return -1;
+}
+
+int legal_moves_from(int from, int *buf){
+    uint8_t piece = board[from];
+    uint8_t me = piece & COLOR_BIT;
+
+    int move_buf[64];
+    int n = possible_moves(piece, from, move_buf);
+    int size = 0;
+
+    for (int i = 0; i < n; i++){
+        int to = move_buf[i];
+        uint8_t captured = board[to];
+
+        board[to] = piece;      // simulate the move
+        board[from] = EMPTY;
+
+        if (!is_check(me))      // see if we get checks
+            buf[size++] = to;
+
+        board[from] = piece;    // undo simulated move.
+        board[to] = captured;
+    }
+
+    return size;
+}
+
+static bool has_legal_move(uint8_t color){
+    int buf[64];
+    for (int i = 0; i < 64; i++){
+        uint8_t piece = board[i];
+        if (piece != EMPTY && (piece & COLOR_BIT) == color)
+            if (legal_moves_from(i, buf) > 0)
+                return true;
+    }
+    return false;
+}
+
+GameStatus game_status(uint8_t color){
+    bool check = is_check(color);
+    bool legal_moves = has_legal_move(color);
+
+    if (check && !legal_moves)
+        return CHECKMATE;
+    else if (!check && !legal_moves)
+        return STALEMATE;
+    else
+        return PLAYING;
 }
