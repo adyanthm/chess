@@ -6,5 +6,5 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(raylib REQUIRED)
 
-add_executable(game renderer.c)
+add_executable(game renderer.c engine.c)
 target_link_libraries(game PRIVATE raylib)
