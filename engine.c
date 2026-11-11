@@ -1,5 +1,7 @@
 #include "engine.h"
 
+int enpassant = -1;
+
 uint8_t board[64] = {
     B_ROOK, B_KNIGHT, B_BISHOP, B_QUEEN, B_KING, B_BISHOP, B_KNIGHT, B_ROOK,
     B_PAWN, B_PAWN,   B_PAWN,   B_PAWN,  B_PAWN, B_PAWN,   B_PAWN,   B_PAWN,
@@ -130,7 +132,11 @@ int possible_moves(PieceType piece, int index, int *move_buf){
             // capture
             for (int df = -1; df <= 1; df += 2) {
                 int cap = offset(index, df, pawn_dir);
-                if (cap != -1 && !is_empty(cap) && (board[cap] & COLOR_BIT) != me)
+                if (cap == -1) continue;
+                bool normal = !is_empty(cap) && (board[cap] & COLOR_BIT) != me;
+                bool ep = is_empty(cap) && cap == enpassant;
+
+                if (normal || ep)
                     move_buf[size++] = cap;
             }
             break;
@@ -211,6 +217,8 @@ int is_under_attack(int index, int piece){
 int legal_moves_from(int from, int *buf){
     uint8_t piece = board[from];
     uint8_t me = piece & COLOR_BIT;
+    int dir = me ? 1 : -1;
+    bool is_pawn = (piece & TYPE_MASK) == W_PAWN;
 
     int move_buf[64];
     int n = possible_moves(piece, from, move_buf);
@@ -220,16 +228,32 @@ int legal_moves_from(int from, int *buf){
         int to = move_buf[i];
         uint8_t captured = board[to];
 
-        board[to] = piece;      // simulate the move
+        /* ---------- Begin En Passant Edge Case ----------*/
+
+        // en passant: pawn lands on the en passant square (empty)
+        bool is_ep = is_pawn && to == enpassant && captured == EMPTY;
+        int victim = to - dir * 8;
+        uint8_t victim_piece = EMPTY;
+
+        if (is_ep){
+            victim_piece = board[victim];
+            board[victim] = EMPTY;  // remove the victim for the test
+        }
+
+        /*---------- End En Passant Edge Case*/
+
+        board[to] = piece;          // simulate the move
         board[from] = EMPTY;
 
-        if (!is_check(me))      // see if we get checks
+        if (!is_check(me))
             buf[size++] = to;
 
-        board[from] = piece;    // undo simulated move.
+        board[from] = piece;        // undo
         board[to] = captured;
-    }
 
+        if (is_ep)
+            board[victim] = victim_piece;
+    }
     return size;
 }
 

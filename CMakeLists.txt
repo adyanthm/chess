@@ -1,9 +1,12 @@
-
 cmake_minimum_required(VERSION 3.16)
 project(MyGame C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE MinSizeRel)
+endif()
 
 find_package(raylib REQUIRED)
 
@@ -27,8 +30,20 @@ set_source_files_properties("${ASSET_OBJ}" PROPERTIES
 add_executable(chess WIN32
     renderer.c
     engine.c
-    "${ASSET_OBJ}"
+    "${ASSET_OBJ}"          # must be listed here
+)
+target_compile_options(chess PRIVATE
+    -Os
+    -ffunction-sections -fdata-sections
+    -fno-asynchronous-unwind-tables -fno-unwind-tables
+    -flto
+)
+
+target_link_options(chess PRIVATE
+    -Wl,--gc-sections
+    -flto
+    -s                      # strip symbols
+    -static                 # no MinGW DLLs;
 )
 
 target_link_libraries(chess PRIVATE raylib)
-target_link_options(chess PRIVATE -mwindows)

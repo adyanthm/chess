@@ -63,6 +63,7 @@ typedef enum {
 #define WHITE_COLOR 0b0000
 
 extern uint8_t board[64];
+extern int enpassant;
 
 int possible_moves(PieceType piece, int index, int *move_buf);
 int is_under_attack(int index, int color);

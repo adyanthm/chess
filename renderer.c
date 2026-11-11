@@ -1,4 +1,5 @@
 #include <raylib.h>
+#include <stdlib.h>
 #include "engine.h"
 #include "themes.h"
 
@@ -118,8 +119,23 @@ static void draw_selection(void) {
 }
 
 static void make_move(int from, int to){
-    board[to] = board[from];
+    uint8_t piece = board[from];
+    bool is_pawn = (piece & TYPE_MASK) == W_PAWN;
+    int dir = (piece & COLOR_BIT) ? 1 : -1; // black moves + and white moves -
+
+    // en passant capture: pawn moves diagonally onto the en passant square (empty square).
+    if (is_pawn && to == enpassant)
+        board[to - dir * 8] = EMPTY; // remove the victim pawn
+
+    // a double push creates the new en passant square, any other move clears it
+    int new_ep = -1;
+    if (is_pawn && abs(to - from) == 16)
+        new_ep = (from + to) / 2;
+
+    board[to] = piece;
     board[from] = EMPTY;
+    enpassant = new_ep;
+
     turn = (turn == 0) ? 1 : 0;
     clear_selection();
     status = game_status(turn_color());
