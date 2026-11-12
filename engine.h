@@ -3,6 +3,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define COLOR_BIT   0b1000
+#define TYPE_MASK   0b0111
+#define BLACK_COLOR 0b1000
+#define WHITE_COLOR 0b0000
+
+#define IS_BLACK(p) (((p) & COLOR_BIT) != 0)
+#define TYPE_OF(p)  ((p) & TYPE_MASK)
+
+#define SQ(f, r)    ((r) * 8 + (f))
+#define FILE_OF(s)  ((s) % 8)
+#define RANK_OF(s)  ((s) / 8)
+
 /*
  * How are we representing the Pieces?
  *
@@ -27,30 +39,22 @@
  * so it looks like white.
 */
 
-#define COLOR_BIT 0b1000
-#define TYPE_MASK 0b0111
-
-#define NUM_PIECES 32
-
-#define IS_BLACK(p) (((p) & COLOR_BIT) != 0)
-#define TYPE_OF(p)  ((p) & TYPE_MASK)
-
 typedef enum {
-    EMPTY       = 0b0000,
+    EMPTY    = 0b0000,
 
-    W_PAWN      = 0b0001,
-    W_KNIGHT    = 0b0010,
-    W_BISHOP    = 0b0011,
-    W_ROOK      = 0b0100,
-    W_QUEEN     = 0b0101,
-    W_KING      = 0b0110,
+    W_PAWN   = 0b0001,
+    W_KNIGHT = 0b0010,
+    W_BISHOP = 0b0011,
+    W_ROOK   = 0b0100,
+    W_QUEEN  = 0b0101,
+    W_KING   = 0b0110,
 
-    B_PAWN      = 0b1001,
-    B_KNIGHT    = 0b1010,
-    B_BISHOP    = 0b1011,
-    B_ROOK      = 0b1100,
-    B_QUEEN     = 0b1101,
-    B_KING      = 0b1110,
+    B_PAWN   = 0b1001,
+    B_KNIGHT = 0b1010,
+    B_BISHOP = 0b1011,
+    B_ROOK   = 0b1100,
+    B_QUEEN  = 0b1101,
+    B_KING   = 0b1110,
 } PieceType;
 
 typedef enum {
@@ -59,19 +63,46 @@ typedef enum {
     STALEMATE,
 } GameStatus;
 
-#define BLACK_COLOR 0b1000
-#define WHITE_COLOR 0b0000
+typedef enum {
+    SIDE_BLACK = 0,
+    SIDE_WHITE = 1,
+} Side;
 
-extern uint8_t board[64];
-extern int enpassant;
+enum { WK_CASTLE = 1, WQ_CASTLE = 2, BK_CASTLE = 4, BQ_CASTLE = 8 };
 
-enum {WK_CASTLE = 1, WQ_CASTLE = 2, BK_CASTLE = 4, BQ_CASTLE = 8};
-extern uint8_t castling;
+typedef struct {
+    uint8_t    board[64];
+    int        king[2];
+    int        enpassant;
+    uint8_t    castling;
+    Side       turn;
+    bool       in_check;
+    GameStatus status;
+} GameState;
+
+extern GameState game;
+
+static inline Side piece_side(uint8_t p) {
+    return (p & COLOR_BIT) ? SIDE_BLACK : SIDE_WHITE;
+}
+
+static inline uint8_t side_to_color(Side s) {
+    return (s == SIDE_BLACK) ? BLACK_COLOR : WHITE_COLOR;
+}
+
+static inline bool in_bounds(int f, int r) {
+    return f >= 0 && f < 8 && r >= 0 && r < 8;
+}
+
+static inline bool is_empty(int f, int r) {
+    return game.board[SQ(f, r)] == EMPTY;
+}
 
 int possible_moves(PieceType piece, int index, int *move_buf);
-int is_under_attack(int index, int color);
-int find_king(uint8_t color);
+int is_under_attack(int index, uint8_t color);
 bool is_check(uint8_t color);
 int legal_moves_from(int from, int *buf);
+void make_move(int from, int to);
 GameStatus game_status(uint8_t color);
+
 #endif
