@@ -1,6 +1,7 @@
 #include "engine.h"
 
 int enpassant = -1;
+uint8_t castling = WK_CASTLE | WQ_CASTLE | BK_CASTLE | BQ_CASTLE;
 
 uint8_t board[64] = {
     B_ROOK, B_KNIGHT, B_BISHOP, B_QUEEN, B_KING, B_BISHOP, B_KNIGHT, B_ROOK,
@@ -60,6 +61,95 @@ static int offset(int index, int df, int dr) {
         return -1;
 
     return rank * 8 + file;
+}
+
+int is_under_attack(int index, int piece){
+    uint8_t me = piece & COLOR_BIT;
+
+    // knight + king
+    for (int j = 0; j < 2; j++){
+        int piece_type = (j == 0) ? W_KNIGHT : W_KING;
+        const int (*deltas)[2] = (j == 0) ? knight_deltas : king_deltas;
+        for (int i = 0; i < 8; i++){
+            int to = offset(index, deltas[i][0], deltas[i][1]);
+            if (to == -1) continue;
+            uint8_t target = board[to];
+            if ((target & TYPE_MASK)== piece_type && // knight / king
+                (target & COLOR_BIT) != me) // its an enemy.
+                return to;
+        }
+    }
+
+
+    // bishop + rook + queen.
+    for (int j = 0; j < 2; j++){
+        const int (*directions)[2] = (j == 0) ? bishop_directions : rook_directions;
+        int piece_type = (j == 0) ? W_BISHOP : W_ROOK;
+        for (int i = 0; i < 4; i++){
+            int df = directions[i][0];
+            int dr = directions[i][1];
+            int pos = index;
+            while ((pos = offset(pos, df, dr)) != -1){
+                uint8_t target = board[pos];
+                if (target == EMPTY){
+                    continue;
+                }
+                if ((target & COLOR_BIT) != me && // its an enemy
+                    ((target & TYPE_MASK) == piece_type || (target & TYPE_MASK) == W_QUEEN)) // its a (bishop / rook) / queen
+                    return pos;
+                break;
+            }
+        }
+    }
+
+    // pawns
+    int my_dir = me ? 1 : -1; // pawns attack me in same direction as my pawns move.
+    int offsets[2][2] = {{1, my_dir}, {-1, my_dir}};
+    for (int i = 0; i < 2; i++) {
+        int from = offset(index, offsets[i][0], offsets[i][1]);
+        if (from == -1) continue;               // off the board
+
+        uint8_t t = board[from];
+        if (t != EMPTY &&
+            (t & TYPE_MASK) == W_PAWN &&        // it's a pawn
+            (t & COLOR_BIT) != me)              // and it's an enemy
+            return from;
+    }
+    return -1;
+}
+
+int find_king(uint8_t color){
+    for (int i = 0; i < 64; i++){
+        int piece = board[i];
+        if(piece != EMPTY && (piece & TYPE_MASK) == W_KING && (piece & COLOR_BIT) == color)
+            return i;
+    }
+    return -1;
+}
+
+bool is_check(uint8_t color){
+    int king = find_king(color);
+    return king != -1 && is_under_attack(king, color) != -1;
+}
+
+static bool can_castle(uint8_t color, bool kingside){
+    int row = color ? 0: 7; // black's rank is 0. white's rank is 7.
+    int king = row * 8 + 4;
+    int step = kingside ? 1 : -1;
+    int castle_type = color ? (kingside ? BK_CASTLE : BQ_CASTLE)
+                            : (kingside ? WK_CASTLE : WQ_CASTLE);
+
+    if (!(castling & castle_type)) return false;
+
+    int rook = row * 8 + (kingside ? 7 : 0);
+    for (int i = king + step; i != rook; i += step)
+        if (board[i] != EMPTY) return false;
+
+    for (int i = 0; i <= 2; i++)
+        if (is_under_attack(king + step * i, color) != -1)
+            return false;
+
+    return true;
 }
 
 int possible_moves(PieceType piece, int index, int *move_buf){
@@ -145,115 +235,55 @@ int possible_moves(PieceType piece, int index, int *move_buf){
     return size;
 }
 
-int find_king(uint8_t color){
-    for (int i = 0; i < 64; i++){
-        int piece = board[i];
-        if(piece != EMPTY && (piece & TYPE_MASK) == W_KING && (piece & COLOR_BIT) == color)
-            return i;
-    }
-    return -1;
-}
-
-bool is_check(uint8_t color){
-    int king = find_king(color);
-    return king != -1 && is_under_attack(king, color) != -1;
-}
-
-int is_under_attack(int index, int piece){
-    uint8_t me = piece & COLOR_BIT;
-
-    // knight + king
-    for (int j = 0; j < 2; j++){
-        int piece_type = (j == 0) ? W_KNIGHT : W_KING;
-        const int (*deltas)[2] = (j == 0) ? knight_deltas : king_deltas;
-        for (int i = 0; i < 8; i++){
-            int to = offset(index, deltas[i][0], deltas[i][1]);
-            if (to == -1) continue;
-            uint8_t target = board[to];
-            if ((target & TYPE_MASK)== piece_type && // knight / king
-                (target & COLOR_BIT) != me) // its an enemy.
-                return to;
-        }
-    }
-
-
-    // bishop + rook + queen.
-    for (int j = 0; j < 2; j++){
-        const int (*directions)[2] = (j == 0) ? bishop_directions : rook_directions;
-        int piece_type = (j == 0) ? W_BISHOP : W_ROOK;
-        for (int i = 0; i < 4; i++){
-            int df = directions[i][0];
-            int dr = directions[i][1];
-            int pos = index;
-            while ((pos = offset(pos, df, dr)) != -1){
-                uint8_t target = board[pos];
-                if (target == EMPTY){
-                    continue;
-                }
-                if ((target & COLOR_BIT) != me && // its an enemy
-                    ((target & TYPE_MASK) == piece_type || (target & TYPE_MASK) == W_QUEEN)) // its a (bishop / rook) / queen
-                    return pos;
-                break;
-            }
-        }
-    }
-
-    // pawns
-    int my_dir = me ? 1 : -1; // pawns attack me in same direction as my pawns move.
-    int offsets[2][2] = {{1, my_dir}, {-1, my_dir}};
-    for (int i = 0; i < 2; i++) {
-        int from = offset(index, offsets[i][0], offsets[i][1]);
-        if (from == -1) continue;               // off the board
-
-        uint8_t t = board[from];
-        if (t != EMPTY &&
-            (t & TYPE_MASK) == W_PAWN &&        // it's a pawn
-            (t & COLOR_BIT) != me)              // and it's an enemy
-            return from;
-    }
-    return -1;
-}
-
-int legal_moves_from(int from, int *buf){
-    uint8_t piece = board[from];
+static bool move_is_safe(int from, int to, uint8_t piece) {
     uint8_t me = piece & COLOR_BIT;
     int dir = me ? 1 : -1;
     bool is_pawn = (piece & TYPE_MASK) == W_PAWN;
+
+    uint8_t captured = board[to];
+
+    // en passant: pawn lands on the (empty) en passant square
+    bool is_ep = is_pawn && to == enpassant && captured == EMPTY;
+    int victim = to - dir * 8;
+    uint8_t victim_piece = EMPTY;
+
+    if (is_ep) {
+        victim_piece = board[victim];
+        board[victim] = EMPTY;
+    }
+
+    board[to] = piece;              // simulate
+    board[from] = EMPTY;
+
+    bool safe = !is_check(me);
+
+    board[from] = piece;            // undo
+    board[to] = captured;
+    if (is_ep)
+        board[victim] = victim_piece;
+
+    return safe;
+}
+
+int legal_moves_from(int from, int *buf) {
+    uint8_t piece = board[from];
+    uint8_t me = piece & COLOR_BIT;
 
     int move_buf[64];
     int n = possible_moves(piece, from, move_buf);
     int size = 0;
 
-    for (int i = 0; i < n; i++){
-        int to = move_buf[i];
-        uint8_t captured = board[to];
+    // normal moves: keep only those that don't leave our king in check
+    for (int i = 0; i < n; i++)
+        if (move_is_safe(from, move_buf[i], piece))
+            buf[size++] = move_buf[i];
 
-        /* ---------- Begin En Passant Edge Case ----------*/
-
-        // en passant: pawn lands on the en passant square (empty)
-        bool is_ep = is_pawn && to == enpassant && captured == EMPTY;
-        int victim = to - dir * 8;
-        uint8_t victim_piece = EMPTY;
-
-        if (is_ep){
-            victim_piece = board[victim];
-            board[victim] = EMPTY;  // remove the victim for the test
-        }
-
-        /*---------- End En Passant Edge Case*/
-
-        board[to] = piece;          // simulate the move
-        board[from] = EMPTY;
-
-        if (!is_check(me))
-            buf[size++] = to;
-
-        board[from] = piece;        // undo
-        board[to] = captured;
-
-        if (is_ep)
-            board[victim] = victim_piece;
+    // castling: king on its home square
+    if ((piece & TYPE_MASK) == W_KING && from == (me ? 4 : 60)) {
+        if (can_castle(me, true))  buf[size++] = from + 2;
+        if (can_castle(me, false)) buf[size++] = from - 2;
     }
+
     return size;
 }
 

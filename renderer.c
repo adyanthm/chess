@@ -121,7 +121,34 @@ static void draw_selection(void) {
 static void make_move(int from, int to){
     uint8_t piece = board[from];
     bool is_pawn = (piece & TYPE_MASK) == W_PAWN;
+    bool is_king = (piece & TYPE_MASK) == W_KING;
     int dir = (piece & COLOR_BIT) ? 1 : -1; // black moves + and white moves -
+
+    // castling: moving rook here.
+    if (is_king && abs(to - from) == 2){
+        if (to > from){
+            // king side castling
+            board[to - 1] = board[to + 1];
+            board[to + 1] = EMPTY;
+        } else{
+            // queen side castling
+            board[to + 1] = board[to - 2];
+            board[to - 2] = EMPTY;
+        }
+    }
+
+    if (is_king)
+        castling &= (piece & COLOR_BIT) ? ~(BK_CASTLE | BQ_CASTLE)
+                                        : ~(WK_CASTLE | WQ_CASTLE);
+    int touched[2] = { from, to };      // covers rook moving AND rook being captured
+    for (int i = 0; i < 2; i++) {
+        switch (touched[i]) {
+            case 0:  castling &= ~BQ_CASTLE; break;
+            case 7:  castling &= ~BK_CASTLE; break;
+            case 56: castling &= ~WQ_CASTLE; break;
+            case 63: castling &= ~WK_CASTLE; break;
+        }
+    }
 
     // en passant capture: pawn moves diagonally onto the en passant square (empty square).
     if (is_pawn && to == enpassant)
@@ -207,7 +234,7 @@ int main(void){
     load_pieces();
     SetExitKey(KEY_NULL);
 
-    SetTargetFPS(60);
+    SetTargetFPS(20);
 
     while (!WindowShouldClose()) {
         handle_keys();

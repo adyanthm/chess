@@ -65,6 +65,9 @@ typedef enum {
 extern uint8_t board[64];
 extern int enpassant;
 
+enum {WK_CASTLE = 1, WQ_CASTLE = 2, BK_CASTLE = 4, BQ_CASTLE = 8};
+extern uint8_t castling;
+
 int possible_moves(PieceType piece, int index, int *move_buf);
 int is_under_attack(int index, int color);
 int find_king(uint8_t color);
