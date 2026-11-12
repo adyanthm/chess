@@ -46,4 +46,8 @@ target_link_options(chess PRIVATE
     -static                 # no MinGW DLLs;
 )
 
-target_link_libraries(chess PRIVATE raylib)
+target_link_libraries(chess PRIVATE
+    "C:/raylib/w64devkit/lib/libraylib.a"
+    winmm
+    gdi32
+)
