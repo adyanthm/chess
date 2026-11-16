@@ -188,8 +188,10 @@ static void draw_promotion(void) {
     for (int i = 0; i < 4; i++) {
         Rectangle r = promo_rect(i);
         bool hover = CheckCollisionPointRec(mouse, r);
-        DrawRectangleRec(r, hover ? theme->selection_light : theme->light);
-        DrawRectangleLinesEx(r, 2, theme->dark);
+        Color tile_bg = IS_BLACK(color_bit) ? theme->dark : theme-> light;
+        Color tile_lines = IS_BLACK(color_bit) ? theme->light : theme-> dark;
+        DrawRectangleRec(r, hover ? theme->selection_light : tile_bg);
+        DrawRectangleLinesEx(r, 2, tile_lines);
         draw_piece(promo_types[i] | color_bit, r.x, r.y, TILE_SIZE);
     }
 }
