@@ -80,6 +80,12 @@ typedef struct {
     GameStatus status;
 } GameState;
 
+typedef struct {
+    uint8_t     from;
+    uint8_t     to;
+    PieceType   piece;
+} Move;
+
 extern GameState game;
 
 static inline Side piece_side(uint8_t p) {
@@ -102,7 +108,9 @@ int possible_moves(PieceType piece, int index, int *move_buf);
 int is_under_attack(int index, uint8_t color);
 bool is_check(uint8_t color);
 int legal_moves_from(int from, int *buf);
-void make_move(int from, int to);
+void make_move(Move move);
 GameStatus game_status(uint8_t color);
+extern const uint8_t promo_types[4];
+bool is_promotion_move(int from, int to);
 
 #endif

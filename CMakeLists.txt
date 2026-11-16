@@ -45,7 +45,7 @@ target_link_options(chess PRIVATE
     -s                      # strip symbols
     -static                 # no MinGW DLLs;
 )
-
+target_include_directories(chess PRIVATE "C:/raylib/w64devkit/include")
 target_link_libraries(chess PRIVATE
     "C:/raylib/w64devkit/lib/libraylib.a"
     winmm

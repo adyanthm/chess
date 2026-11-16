@@ -2,6 +2,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+const uint8_t promo_types[4] = { W_QUEEN, W_ROOK, W_BISHOP, W_KNIGHT };
+
 GameState game = {
     .board = {
         B_ROOK, B_KNIGHT, B_BISHOP, B_QUEEN, B_KING, B_BISHOP, B_KNIGHT, B_ROOK,
@@ -133,6 +135,13 @@ static bool can_castle(uint8_t color, bool kingside) {
             return false;
 
     return true;
+}
+
+bool is_promotion_move(int from, int to) {
+    uint8_t piece = game.board[from];
+    if (TYPE_OF(piece) != W_PAWN) return false;
+    int r = RANK_OF(to);
+    return IS_BLACK(piece) ? r == 7 : r == 0;
 }
 
 int possible_moves(PieceType piece, int index, int *move_buf) {
@@ -293,12 +302,12 @@ GameStatus game_status(uint8_t color) {
         return PLAYING;
 }
 
-void make_move(int from, int to) {
-    uint8_t piece = game.board[from];
+void make_move(Move move) {
+    uint8_t piece = game.board[move.from];
     bool is_pawn = TYPE_OF(piece) == W_PAWN;
     bool is_king = TYPE_OF(piece) == W_KING;
-    int from_f = FILE_OF(from), from_r = RANK_OF(from);
-    int to_f   = FILE_OF(to),   to_r   = RANK_OF(to);
+    int from_f = FILE_OF(move.from), from_r = RANK_OF(move.from);
+    int to_f   = FILE_OF(move.to),   to_r   = RANK_OF(move.to);
 
     // castling: move rook
     if (is_king && abs(to_f - from_f) == 2) {
@@ -312,12 +321,12 @@ void make_move(int from, int to) {
     }
 
     if (is_king) {
-        game.king[piece_side(piece)] = to;
+        game.king[piece_side(piece)] = move.to;
         game.castling &= (piece & COLOR_BIT) ? ~(BK_CASTLE | BQ_CASTLE)
                                              : ~(WK_CASTLE | WQ_CASTLE);
     }
 
-    int touched[2] = { from, to };
+    int touched[2] = { move.from, move.to };
     for (int i = 0; i < 2; i++) {
         switch (touched[i]) {
             case SQ(0, 0): game.castling &= ~BQ_CASTLE; break;
@@ -328,15 +337,15 @@ void make_move(int from, int to) {
     }
 
     // en passant capture
-    if (is_pawn && to == game.enpassant)
+    if (is_pawn && move.to == game.enpassant)
         game.board[SQ(to_f, from_r)] = EMPTY;
 
     int new_ep = -1;
     if (is_pawn && abs(to_r - from_r) == 2)
         new_ep = SQ(from_f, (from_r + to_r) / 2);
 
-    game.board[to] = piece;
-    game.board[from] = EMPTY;
+    game.board[move.to] = move.piece;
+    game.board[move.from] = EMPTY;
     game.enpassant = new_ep;
 
     game.turn = (game.turn == SIDE_WHITE) ? SIDE_BLACK : SIDE_WHITE;
